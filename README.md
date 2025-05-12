@@ -67,7 +67,7 @@ Shell script for computing SHAP values via k-iteration bootstrap runs on GENIE c
 
 ## 📂 Folder Structure (Recommended)
 ```bash
-project-root/
+dementia_classification/
 ├── models/                  
 ├── results/
 ├── images/                  
