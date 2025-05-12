@@ -37,7 +37,7 @@ Train ML classifiers (XGBoost or SVM) with cross-validation and domain adaptatio
 --corr_alpha              Threshold for correlation removal  
 --harmonize               Whether to apply harmonization (0/1)  
 --sim_threshold           Similarity threshold for KMM  
-
+```
 
 ### `train_ml_gridsearch_cv.py`
 
@@ -52,4 +52,38 @@ Train XGBoost models with custom objectives for:
 --train_approach         Strategy: 'few_shot' or 'semi_supervised'  
 --objective_version      Version of custom objective: 'v1' or 'v2'  
 --objective_subtype      Custom loss variant: '1A', '1B', '1C', '2A', or '2B'  
+```
 
+### `visualize.ipynb`
+Notebook for visualizing key results:
+- Performance metrics (Balanced Accuracy, FPR, FNR)
+- Pareto front plots for trade-offs between accuracy and fairness
+- Confidence interval plots
+- SHAP heatmaps of regional brain contributions
+- Partial dependence plots to interpret model behavior between SHAP values and brain volumes
+
+### `shap_computation.sh`
+Shell script for computing SHAP values via k-iteration bootstrap runs on GENIE cluster.
+
+## 📂 Folder Structure (Recommended)
+```bash
+project-root/
+├── models/                  
+├── results/
+├── images/                  
+├── data/                    
+├── train_ml_gridsearch_cv.py
+│   train_custom_obj.py
+│   ops.py
+│   models.py
+│   custom_objectives.py
+├── shap_computation.sh
+│   shap_computation_w_bootstrap.py
+├── visualize.ipynb
+│   viz_utils.sh
+└── README.md
+```
+
+## 👨‍⚕️ Authors
+- Henry Ho – Postdoctoral Researcher, The Biggs Institute for Alzheimer's & Neurodegenerative Diseases
+- Advisor: Prof. Mohamad Habes
