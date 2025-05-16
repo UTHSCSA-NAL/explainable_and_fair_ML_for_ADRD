@@ -8,7 +8,7 @@ This research investigates the fairness of machine learning (ML) models in demen
 
 - **Data harmonization**
 - [**Correlation remover (CR)**](https://fairlearn.org/main/api_reference/generated/fairlearn.preprocessing.CorrelationRemover.html)
-- **Domain adaptation (Kernel Mean Matching, KMM)**
+- [**Domain adaptation (Kernel Mean Matching, KMM)**](http://adapt-python.github.io/adapt/generated/adapt.instance_based.KMM.html)
 - **Semi-supervised domain adaptation**
 - **Few-shot domain alignment**
 
