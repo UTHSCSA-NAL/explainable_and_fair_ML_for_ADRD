@@ -537,9 +537,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training AD Classification")
     # Data Arguments
-    parser.add_argument("--save_model_path", type=str, default=r'/home/Codes/ad_classification/models/xgb_new', help="Saved model path")
-    parser.add_argument("--save_result_path", type=str, default=r'/home/Codes/ad_classification/results/xgb_new', help="Saved result path")
-    parser.add_argument("--df_roi", type=str, default=r'/home/Codes/ad_classification/data/filtered_data_09182024_Harmonized_DX.csv', help="Path to CSV data file of MUSE ROI")
+    parser.add_argument("--save_model_path", type=str, default=r'/home/Codes/ad_classification/models/xgb_cr_new', help="Saved model path")
+    parser.add_argument("--save_result_path", type=str, default=r'/home/Codes/ad_classification/results/xgb_cr_new', help="Saved result path")
+    parser.add_argument("--df_roi", type=str, default=r'/home/Codes/ad_classification/data/filtered_data_09182024.csv', help="Path to CSV data file of MUSE ROI")
     #parser.add_argument("--df_roi", type=str, default=r'/home/Codes/ad_classification/data/filtered_data_09182024.csv', help="Path to CSV data file of MUSE ROI")
     #parser.add_argument("--df_dem", type=str, default=r'/henryho/ad_classification/data/mri_ID_w_diag.csv', help="Path to CSV data file of demographic")
     parser.add_argument("--train_type", type=str, default='All', help="Type of training dataset: All, NHW, NHA, or Hispanic")
@@ -551,7 +551,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_scaling", type=int, default=0, help="Normalize data")
     parser.add_argument("--corr_remove", type=int, default=0, help="Remove feature correlation")
     parser.add_argument("--corr_alpha", type=float, default=0.05, help="Correlation factor")
-    parser.add_argument("--harmonize", type=int, default=1, help="whether using harmonization")
+    parser.add_argument("--harmonize", type=int, default=0, help="whether using harmonization")
     parser.add_argument("--sim_threshold", type=float, default=1., help="similarity threshold")
     
     args = parser.parse_args()

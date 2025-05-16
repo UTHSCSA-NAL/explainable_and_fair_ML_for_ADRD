@@ -1,13 +1,13 @@
-# Representative and Explainable AI for Multi-Ethnic Dementia Pattern Recognition
+# Advancing Fair and Explainable Machine Learning for Neuroimaging Dementia Pattern Classification in Multi-Ethnic Populations
 
 ## 🧠 Abstract
 
-Dementia, a degenerative disease affecting millions globally, is projected to triple in prevalence by 2050. Early and precise diagnosis is essential for effective treatment and improved quality of life. However, current diagnostic approaches may show inconsistent precision and fairness, particularly among diverse cultural groups.
+Current diagnostic approaches may show inconsistent precision and fairness, particularly among diverse cultural groups.
 
 This research investigates the fairness of machine learning (ML) models in dementia classification across multi-ethnic populations, specifically focusing on White American, African American, and Hispanic groups. A gradient boosting classifier is employed to assess classification performance using discrepancy mitigation techniques such as:
 
 - **Data harmonization**
-- **Correlation removal (CR)**
+- **Correlation remover (CR)**
 - **Domain adaptation (Kernel Mean Matching, KMM)**
 - **Semi-supervised domain adaptation**
 - **Few-shot domain alignment**
@@ -20,7 +20,7 @@ We find significant performance discrepancies when models trained on one group a
 
 ### `train_ml_gridsearch_cv.py`
 
-Train ML classifiers (XGBoost or SVM) with cross-validation and domain adaptation. Supports harmonization, correlation removal, and KMM.
+Train ML classifiers (XGBoost or SVM) with cross-validation and domain adaptation. Supports harmonization, correlation remover, and KMM.
 
 #### Key Arguments:
 ```python
@@ -39,7 +39,7 @@ Train ML classifiers (XGBoost or SVM) with cross-validation and domain adaptatio
 --sim_threshold           Similarity threshold for KMM  
 ```
 
-### `train_ml_gridsearch_cv.py`
+### `train_custom_obj.py`
 
 Train XGBoost models with custom objectives for:
 - Few-shot learning (e.g., subtype '1B')

@@ -563,13 +563,13 @@ def plot_fit_central_pareto_front(performance, methods, groups, fig_config,
 
     ax.set_xlabel(f"Overall {metric_titles[0]} (%)", fontsize=30)
     ax.set_ylabel(f"Overall {metric_titles[1]} (%)", fontsize=30)
-    ax.set_xlim([50, 90])
+    ax.set_xlim([65, 90])
     ax.set_ylim([fig_config[0], fig_config[1]])
     ax.tick_params(labelsize=24)
 
-    ax.arrow(50.5, fig_config[2], fig_config[3], 0,
+    ax.arrow(66.5, fig_config[2], fig_config[3], 0,
              lw=2, head_width=fig_config[4], head_length=fig_config[5])
-    ax.text(51, fig_config[6], 'Better performance', fontsize=24)
+    ax.text(67, fig_config[6], 'Better performance', fontsize=24)
 
     ax.arrow(87.5, fig_config[7], 0, fig_config[8],
              lw=2, head_width=fig_config[9], head_length=fig_config[10])
