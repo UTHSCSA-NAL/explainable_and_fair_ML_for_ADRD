@@ -7,8 +7,8 @@ Current diagnostic approaches may show inconsistent precision and fairness, part
 This research investigates the fairness of machine learning (ML) models in dementia classification across multi-ethnic populations, specifically focusing on White American, African American, and Hispanic groups. A gradient boosting classifier is employed to assess classification performance using discrepancy mitigation techniques such as:
 
 - **Data harmonization**
-- **Correlation remover (CR)**
-- **Domain adaptation (Kernel Mean Matching, KMM)**
+- [**Correlation remover (CR)**](https://fairlearn.org/main/api_reference/generated/fairlearn.preprocessing.CorrelationRemover.html)
+- [**Domain adaptation (Kernel Mean Matching, KMM)**](http://adapt-python.github.io/adapt/generated/adapt.instance_based.KMM.html)
 - **Semi-supervised domain adaptation**
 - **Few-shot domain alignment**
 
