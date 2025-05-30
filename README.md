@@ -50,7 +50,7 @@ Train XGBoost models with custom objectives for:
 --scenario               Training scenario
 --save_model_path        Path to save models  
 --save_result_path       Path to save results 
---objective_subtype      Custom loss variant: '1A', '1B', '1C', '2A', or '2B'  
+--objective_subtype      Custom loss variant: '1C' or '2B'  
 --num_few_shot
 --total_steps
 --inner_splits
