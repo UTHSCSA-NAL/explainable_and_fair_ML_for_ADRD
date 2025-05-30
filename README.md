@@ -47,11 +47,15 @@ Train XGBoost models with custom objectives for:
 
 #### Key Arguments:
 ```python
+--scenario               Training scenario
 --save_model_path        Path to save models  
---save_result_path       Path to save results  
---train_approach         Strategy: 'few_shot' or 'semi_supervised'  
---objective_version      Version of custom objective: 'v1' or 'v2'  
+--save_result_path       Path to save results 
 --objective_subtype      Custom loss variant: '1A', '1B', '1C', '2A', or '2B'  
+--num_few_shot
+--total_steps
+--inner_splits
+--outer_splits
+--n_job
 ```
 
 ### `visualize.ipynb`
