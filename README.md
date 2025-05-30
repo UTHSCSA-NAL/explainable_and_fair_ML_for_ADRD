@@ -66,9 +66,6 @@ Notebook for visualizing key results:
 - SHAP heatmaps of regional brain contributions
 - Partial dependence plots to interpret model behavior between SHAP values and brain volumes
 
-### `shap_computation.sh`
-Shell script for computing SHAP values via k-iteration bootstrap runs on GENIE cluster.
-
 ## 📂 Folder Structure (Recommended)
 ```bash
 dementia_classification/
@@ -81,8 +78,6 @@ dementia_classification/
 │   ops.py
 │   models.py
 │   custom_objectives.py
-├── shap_computation.sh
-│   shap_computation_w_bootstrap.py
 ├── visualize.ipynb
 │   viz_utils.sh
 └── README.md
