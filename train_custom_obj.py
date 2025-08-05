@@ -13,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 import xgboost as xgb
 
-sys.path.append("/home/Codes/ad_classification")
 from custom_objectives import CustomObjective, sigmoid
 from train_utils import select_few_shot_target
 
@@ -191,6 +190,18 @@ def train_pipeline(args):
     src        = os.path.dirname(os.path.abspath(__file__))
     scenarios  = ['all', 'nhw', 'nha', 'hisp']
     folds      = range(1, args.outer_splits+1)
+    
+    model_dir = os.path.join(
+        args.save_model_path,
+        f"xgb_{args.objective_subtype}"
+    )
+    os.makedirs(model_dir, exist_ok=True)
+    pred_dir = os.path.join(
+        args.save_result_path,
+        f"xgb_{args.objective_subtype}"
+    )
+    os.makedirs(pred_dir, exist_ok=True)
+    
 
     for scenario in scenarios:
         args.scenario = scenario
@@ -215,22 +226,12 @@ def train_pipeline(args):
             )
 
             # --- Save model ---
-            model_dir = os.path.join(
-                args.save_model_path,
-                f"xgb_{args.objective_subtype}"
-            )
-            os.makedirs(model_dir, exist_ok=True)
             model_filename = f"scenario_{scenario}_fold_{fold}_model.json"
             model.save_model(os.path.join(model_dir, model_filename))
 
             # --- Save predictions ---
             pred_df = test_df[["ID","RACE","HISPANIC","NACCUDSD"]].copy()
             pred_df["PREDICTION"] = raw_preds
-            pred_dir = os.path.join(
-                args.save_result_path,
-                f"xgb_{args.objective_subtype}"
-            )
-            os.makedirs(pred_dir, exist_ok=True)
             pred_filename = f"scenario_{scenario}_fold_{fold}_predict.csv"
             pred_df.to_csv(os.path.join(pred_dir, pred_filename), index=False)
 
@@ -263,15 +264,16 @@ def train_pipeline(args):
                 fnr_s = fn/(fn+tp+1e-6)
                 print(f"  {name}: BA={ba_s:.4f}, FPR={fpr_s:.4f}, FNR={fnr_s:.4f}")
 
-if __name__ == "__main__":
+if __name__ == "__main__" and os.getcwd().endswith("dementia_classification"):
+    sys.path.insert(0, os.path.abspath(".."))
     parser = argparse.ArgumentParser(
         description="Nested‐CV train with custom objective 1C or 2B"
     )
     parser.add_argument("--scenario",         type=str, default="all")
     parser.add_argument("--save_model_path",  type=str,
-                        default="/home/Codes/ad_classification/models")
+                        default="./models")
     parser.add_argument("--save_result_path", type=str,
-                        default="/home/Codes/ad_classification/results")
+                        default="./results")
     parser.add_argument("--objective_subtype",type=str, choices=['1C','2B'],
                         default='1C',
                         help="Use only '1C' or '2B'")

@@ -16,6 +16,13 @@ We find significant performance discrepancies when models trained on one group a
 
 ---
 
+## 🔧 Installation
+```
+conda env create -f environment.yml
+conda activate dementia_ai
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+```
+
 ## 🧪 Scripts Overview
 
 ### `train_ml_gridsearch_cv.py`
@@ -58,6 +65,16 @@ Train XGBoost models with custom objectives for:
 --n_job
 ```
 
+### Training
+Revise the hyper-parameters in `run_python.sh` first.
+Example:
+```
+bash run_python.sh mode1
+bash run_python.sh mode2
+```
+- mode1: train with baseline, CR, KMM, data harmonization
+- mode2: train with SSDA (1C) and RegAlign (2B)
+
 ### `visualize.ipynb`
 Notebook for visualizing key results:
 - Performance metrics (Balanced Accuracy, FPR, FNR)
@@ -70,9 +87,11 @@ Notebook for visualizing key results:
 ```bash
 dementia_classification/
 ├── models/                  
-├── results/
-├── images/                  
-├── data/                    
+├── results/                 
+├── data/
+├──── split_fold_w_augmented
+├──── filtered_data_09182024.csv
+├──── filtered_data_09182024_Harmonized_DX.csv
 ├── train_ml_gridsearch_cv.py
 │   train_custom_obj.py
 │   ops.py
@@ -84,5 +103,5 @@ dementia_classification/
 ```
 
 ## 👨‍⚕️ Authors
-- Henry Ho – Postdoctoral Researcher, The Biggs Institute for Alzheimer's & Neurodegenerative Diseases
+- Dr. Ngoc-Huynh Ho (Henry) – Postdoctoral Researcher, The Biggs Institute for Alzheimer's & Neurodegenerative Diseases
 - Advisor: Prof. Mohamad Habes

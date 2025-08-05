@@ -1,5 +1,4 @@
 import sys
-sys.path.append("/home/Codes/ad_classification")
 
 import os
 import time
@@ -349,12 +348,13 @@ def main(args):
     print("All done in", time.time()-starttime, "seconds.")
     
 
-if __name__ == "__main__":
+if __name__ == "__main__" and os.getcwd().endswith("dementia_classification"):
+    sys.path.insert(0, os.path.abspath(".."))
     parser = argparse.ArgumentParser(description="Training AD Classification")
     # Data Arguments
-    parser.add_argument("--save_model_path", type=str, default=r'/home/Codes/ad_classification/models/xgb', help="Saved model path")
-    parser.add_argument("--save_result_path", type=str, default=r'/home/Codes/ad_classification/results/xgb', help="Saved result path")
-    parser.add_argument("--df_roi", type=str, default=r'/home/Codes/ad_classification/data/filtered_data_09182024.csv', help="Path to CSV data file of MUSE ROI")
+    parser.add_argument("--save_model_path", type=str, default=r'./models/xgb', help="Saved model path")
+    parser.add_argument("--save_result_path", type=str, default=r'./results/xgb', help="Saved result path")
+    parser.add_argument("--df_roi", type=str, default=r'./data/filtered_data_09182024.csv', help="Path to CSV data file of MUSE ROI")
     parser.add_argument("--train_type", type=str, default='All', help="Type of training dataset: All, NHW, NHA, or Hispanic")
     parser.add_argument("--train_drop_rate", type=int, default=0, help="Rate to drop training sample")
     parser.add_argument("--model_name", type=str, default='xgboost', help="Type of ML classifier: xgboost, svm")
