@@ -148,8 +148,3 @@ Training produces:
 - `summary_metrics_*.json`: metrics
 - `sensitivity*.json`: method sensitivity records
 - `meta.json`: run metadata
-
-## Notes
-- `scale_mode=5` requires `ICV`; the sample splits include `ICV` but it is excluded from model features.
-- GPU acceleration (XGBoost, SHAP) is supported if available.
-- KMM uses ADAPT if installed; otherwise it falls back to a custom solver.
