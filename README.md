@@ -1,6 +1,6 @@
 # Explainable and Fair ML for ADRD
 
-A minimal, functional pipeline for training, evaluating, and explaining ADRD classifiers with fairness-aware methods. It is rebuilt from `dementia_ai` with reduced surface area, config-driven defaults, and a small reproducible sample split.
+Dementia, a degenerative disease affecting millions globally, is projected to triple by 2050. Early and precise diagnosis is essential for effective treatment and improved quality of life. However, current diagnostic approaches frequently demonstrate inconsistent precision and impartiality, particularly among diverse cultural groups. This study investigates performance discrepancies in dementia classification among 6,584 White American, 1,263 African American, and 713 Hispanic populations. We reveal significant cross-group bias, particularly when models trained on one group are tested on another. To address this, we introduce a novel combination of few-shot learning and domain alignment to improve model adaptability across underrepresented populations. Our results show that these techniques substantially reduce inter-group performance gaps, especially between White American and Hispanic cohorts. This finding highlights the crucial need for fairness-aware strategies and the inclusion of diverse populations in training data to ensure accurate and equitable dementia diagnoses.
 
 ## What is included
 - Core training logic (baseline, CR, KMM, SSDA, RegAlign)
@@ -19,13 +19,16 @@ The split rule is:
 
 The resulting CSVs are in `data_splits/` and match the structure of
 `data_splits/harmonized_test/balanced_split.csv` except:
-- `ICV` is removed
+- `ICV` is included for scale_mode=5 but excluded from training features
 - `COHORT`, `PHASE`, `PTID`, `RID`, `MRI_ID` are integer-encoded
 
 ## Installation
 From the repo root:
 
 ```bash
+conda create -n dementia_ai python=3.11
+conda activate dementia_ai
+conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 pytorch-cuda=12.4 -c pytorch -c nvidia
 pip install -e .
 ```
 
@@ -34,6 +37,12 @@ Optional (for KMM via ADAPT):
 ```bash
 pip install -e .[adapt]
 ```
+
+## Neuroimaging preprocessing for T1w scans
+- LPS reorientation
+- N4 bias correction
+- skull-stripping HD-BET: https://github.com/MIC-DKFZ/HD-BET
+- MUSE feature extraction: via MUSE: https://github.com/CBICA/MUSE
 
 ## Quick start
 
@@ -141,6 +150,6 @@ Training produces:
 - `meta.json`: run metadata
 
 ## Notes
-- `scale_mode=5` requires an `ICV` column; the sample splits do not include `ICV`.
+- `scale_mode=5` requires `ICV`; the sample splits include `ICV` but it is excluded from model features.
 - GPU acceleration (XGBoost, SHAP) is supported if available.
 - KMM uses ADAPT if installed; otherwise it falls back to a custom solver.
