@@ -52,8 +52,8 @@ def _load_configs() -> dict:
 NON_FEATURE_COLS = [
     "COHORT", "PHASE", "PTID", "RID", "MRI_ID", "SITEID",
     "EDUCATION", "MARRY", "SEX", "AGE", "ADAS13", "CDRSB", "MMSE",
-    "ETHNICITY", "DX"
-]
+    "ICV",
+    "ETHNICITY", "DX"]
 ETH_MAP = {"White": "NHW", "Black": "NHA", "Hispanic": "HWA",
            "white": "NHW", "black": "NHA", "hispanic": "HWA",
            "NHW": "NHW", "NHA": "NHA", "HWA": "HWA"}
