@@ -9,18 +9,6 @@ Dementia, a degenerative disease affecting millions globally, is projected to tr
 - Configs in `configs/` for defaults and grids
 - Sample splits in `data_splits/` (train/test/external)
 
-## Data splits
-Sample data are drawn from:
-`data_splits/merged_muse_ADNI_NACC_SCAN_STAC_HABSHD_Nov13_2025_baseline_QC_harmonized_phases.csv`
-
-The split rule is:
-- 100 rows for `train.csv` and 100 rows for `test.csv` from NACC + SCAN
-- 100 rows for `external.csv` from ADNI + STAC
-
-The resulting CSVs are in `data_splits/` and match the structure of
-`data_splits/harmonized_test/balanced_split.csv` except:
-- `ICV` is included for scale_mode=5 but excluded from training features
-- `COHORT`, `PHASE`, `PTID`, `RID`, `MRI_ID` are integer-encoded
 
 ## Installation
 From the repo root:
@@ -51,14 +39,13 @@ Train a model (single run):
 ```bash
 dai train \
   --train_csv data_splits/train.csv \
-  --test_csv data_splits/test.csv \
-  --external_csv data_splits/external.csv \
-  --save_root runs \
+  --save_root results \
   --scenario all \
   --method baseline \
   --model_name xgboost_vanilla \
-  --n_repeats 1 \
-  --run_range 0-0
+  --cv_splits 3 \
+  --n_repeats 2 \
+  --run_range 0-1
 ```
 
 Use the provided runner:
@@ -85,8 +72,9 @@ Adds `y_score` and `y_prob` to a CSV using a trained model.
 
 ```bash
 dai predict \
-  --model_path runs/train_small/baseline_xgboost_vanilla/all/run_000/model.pkl \
-  --input_csv data_splits/test.csv
+  --model_path results/train_small/baseline_xgboost_vanilla/all/run_000/model.pkl \
+  --input_csv data_splits/test.csv \
+  --output_csv results/train_small/baseline_xgboost_vanilla/all/run_000/predictions/test_pred.csv
 ```
 
 ### Evaluate
@@ -94,7 +82,7 @@ Computes group metrics and pairwise FNR/FPR gaps.
 
 ```bash
 dai evaluate \
-  --data_csv data_splits/test_pred.csv \
+  --data_csv results/train_small/baseline_xgboost_vanilla/all/run_000/predictions/test_pred.csv \
   --group_col ETHNICITY \
   --label_col DX \
   --score_col y_prob
@@ -107,17 +95,17 @@ Train mode (save a KMM model + weights for a pair):
 dai prefit_kmm train \
   --data_csv data_splits/train.csv \
   --group_col ETHNICITY \
-  --pairs White->Black \
+  --pairs 'White->Black' \
   --output_root checkpoints/kmm_models
 ```
 
-Apply mode (use prefitted models to generate weights for all pairs):
+Apply mode (use prefitted models to generate weights for a pair):
 
 ```bash
 dai prefit_kmm apply \
   --data_csv data_splits/train.csv \
   --group_col ETHNICITY \
-  --pairs White->Black,White->Hispanic \
+  --pairs 'White->Black' \
   --models_root checkpoints/kmm_models \
   --param_id kmm_default \
   --output_csv checkpoints/kmm_weights.csv
@@ -125,13 +113,14 @@ dai prefit_kmm apply \
 
 ### Compute SHAP
 TreeSHAP values for each feature. Uses results under `--results_root`.
+https://shap.readthedocs.io/en/latest/generated/shap.TreeExplainer.html
 
 ```bash
 dai compute_shap \
   --scenario all \
   --method_tag baseline_xgboost_vanilla \
-  --results_root runs \
-  --output_root runs/shap_small
+  --results_root results \
+  --output_root results/shap_small
 ```
 
 ## Configs
