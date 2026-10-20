@@ -80,6 +80,8 @@ def _fit_kmm(Xs: np.ndarray, Xt: np.ndarray, params: Dict):
         if w is None:
             try:
                 w = kmm.predict_weights(Xs)
+            except TypeError:
+                w = kmm.predict_weights()
             except Exception:
                 w = None
         if w is not None:

@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -11,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -154,23 +156,28 @@ def cmd_predict(argv: List[str]) -> int:
     X = _prepare_features(df, feat_cols, scaler, scale_mode)
     y_score, y_prob = _predict_scores(estimator, X)
 
-    out_df = df.copy()
-    out_df["y_score"] = y_score
-    out_df["y_prob"] = y_prob
-
     if args.output_csv:
         out_path = Path(args.output_csv)
     else:
         in_path = Path(args.input_csv)
         out_path = in_path.with_name(f"{in_path.stem}_pred.csv")
+    if Path(args.input_csv).resolve() == out_path.resolve():
+        raise ValueError("output_csv must be different from input_csv")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(args.input_csv, out_path)
+
+    out_df = pd.read_csv(out_path, low_memory=False)
+    out_df["y_score"] = y_score
+    out_df["y_prob"] = y_prob
     out_df.to_csv(out_path, index=False)
     print(f"[OK] wrote {out_path}")
     return 0
 
 
 def _normalize_labels(series: pd.Series) -> np.ndarray:
-    if series.dtype == object:
-        return series.map(U.DX_MAP).astype(int).to_numpy()
+    if not pd.api.types.is_numeric_dtype(series):
+        series = series.map(U.DX_MAP)
+    series = pd.to_numeric(series, errors="coerce")
     return series.astype(int).to_numpy()
 
 
@@ -279,10 +286,19 @@ def _parse_pairs(pairs_str: Optional[str]) -> List[Tuple[str, str]]:
         item = item.strip()
         if not item:
             continue
+        if item.endswith("-") and ">" not in item:
+            raise ValueError(
+                f"Invalid pair spec: {item}. Use quotes, e.g. --pairs 'White->Black', "
+                "or use ':' as a separator (White:Black)."
+            )
         if "->" in item:
             src, tgt = item.split("->", 1)
         elif ">" in item:
             src, tgt = item.split(">", 1)
+        elif ":" in item:
+            src, tgt = item.split(":", 1)
+        elif "|" in item:
+            src, tgt = item.split("|", 1)
         else:
             raise ValueError(f"Invalid pair spec: {item}")
         pairs.append((src.strip(), tgt.strip()))
@@ -311,7 +327,10 @@ def _fit_kmm(Xs: np.ndarray, Xt: np.ndarray, params: Dict):
         kmm.fit(Xs, np.zeros(len(Xs)))
         w = getattr(kmm, "sample_weights_", None)
         if w is None:
-            w = kmm.predict_weights(Xs)
+            try:
+                w = kmm.predict_weights(Xs)
+            except TypeError:
+                w = kmm.predict_weights()
         return np.asarray(w, dtype=float), kmm
     except Exception as e:
         print(f"[WARN] ADAPT KMM failed ({e}); falling back to ops.compute_sample_weight_kmm")
@@ -352,12 +371,13 @@ def cmd_prefit_kmm(argv: List[str]) -> int:
     sub = ap.add_subparsers(dest="mode", required=True)
 
     ap_train = sub.add_parser("train")
-    ap_train.add_argument("--data_csv", required=True)
+    ap_train.add_argument("--data_csv", required=True, nargs="+")
     ap_train.add_argument("--group_col", default="ETHNICITY")
-    ap_train.add_argument("--pairs", default=None, help="Comma list of src->tgt pairs")
+    ap_train.add_argument("--pairs", default=None, help="Comma list of src->tgt pairs (quote values with '>')")
     ap_train.add_argument("--output_root", default="./checkpoints/kmm_models")
     ap_train.add_argument("--scale_mode", type=int, default=0)
     ap_train.add_argument("--icv_col", default="ICV")
+    ap_train.add_argument("--all_grid", action="store_true", help="Run all KMM combinations from configs/grids.yaml")
     ap_train.add_argument("--param_id", default=None)
     ap_train.add_argument("--kmm_kernel", default=None)
     ap_train.add_argument("--kmm_B", type=float, default=None)
@@ -369,9 +389,9 @@ def cmd_prefit_kmm(argv: List[str]) -> int:
     ap_train.add_argument("--kmm_scale", type=float, default=None)
 
     ap_apply = sub.add_parser("apply")
-    ap_apply.add_argument("--data_csv", required=True)
+    ap_apply.add_argument("--data_csv", required=True, nargs="+")
     ap_apply.add_argument("--group_col", default="ETHNICITY")
-    ap_apply.add_argument("--pairs", default=None, help="Comma list of src->tgt pairs")
+    ap_apply.add_argument("--pairs", default=None, help="Comma list of src->tgt pairs (quote values with '>')")
     ap_apply.add_argument("--models_root", default="./checkpoints/kmm_models")
     ap_apply.add_argument("--param_id", required=True)
     ap_apply.add_argument("--output_csv", required=True)
@@ -379,7 +399,9 @@ def cmd_prefit_kmm(argv: List[str]) -> int:
     args = ap.parse_args(argv)
 
     if args.mode == "train":
-        df = pd.read_csv(args.data_csv, low_memory=False)
+        csvs = args.data_csv if isinstance(args.data_csv, list) else [args.data_csv]
+        frames = [pd.read_csv(p, low_memory=False) for p in csvs]
+        df = pd.concat(frames, ignore_index=True)
         feat_cols = U.select_feature_columns(df)
         X_raw = np.rint(df[feat_cols].to_numpy()).astype(np.float32)
         icv = None
@@ -389,56 +411,71 @@ def cmd_prefit_kmm(argv: List[str]) -> int:
             icv = df[args.icv_col].to_numpy(dtype=np.float32)
         X_scaled, scaler = ops.scaling_data(X_raw, scaling_mode=args.scale_mode, return_scaler=True, icv_train=icv)
 
-        params = _kmm_params_from_config()
+        base_params = _kmm_params_from_config()
         for key in ["kmm_kernel", "kmm_B", "kmm_eps", "kmm_max_size", "kmm_gamma", "kmm_clip_min", "kmm_clip_max", "kmm_scale"]:
             val = getattr(args, key)
             if val is not None:
-                params[key] = val
+                base_params[key] = val
 
-        param_id = args.param_id or U.kmm_param_id(params)
+        if args.all_grid and args.param_id:
+            raise ValueError("--param_id cannot be used with --all_grid")
+        if args.all_grid:
+            grid = U.method_param_grid("kmm")
+            grid_list = list(ParameterGrid(grid)) if grid else [dict()]
+            params_list = []
+            for g in grid_list:
+                params = dict(base_params)
+                params.update(g)
+                params_list.append(params)
+        else:
+            params_list = [base_params]
         pairs = _parse_pairs(args.pairs)
 
         id_col = U.id_column(df) or "ID"
         ids = df[id_col].astype(str) if id_col in df.columns else pd.Series(df.index.astype(str))
         groups = df[args.group_col].astype(str)
 
-        for src, tgt in pairs:
-            mask_src = groups.str.lower() == src.lower()
-            mask_tgt = groups.str.lower() == tgt.lower()
-            if not mask_src.any() or not mask_tgt.any():
-                print(f"[WARN] Skipping {src}->{tgt}: missing source or target rows")
-                continue
-            Xs = X_scaled[mask_src.values]
-            Xt = X_scaled[mask_tgt.values]
-            w, kmm_model = _fit_kmm(Xs, Xt, params)
-            if w is None:
-                continue
-            w = np.asarray(w, dtype=float) * float(params.get("kmm_scale", 1.0))
-            clip_min = params.get("kmm_clip_min")
-            clip_max = params.get("kmm_clip_max")
-            if clip_min is not None or clip_max is not None:
-                w = np.clip(w, clip_min if clip_min is not None else w.min(), clip_max if clip_max is not None else w.max())
+        for params in params_list:
+            param_id = args.param_id or U.kmm_param_id(params)
+            for src, tgt in pairs:
+                mask_src = groups.str.lower() == src.lower()
+                mask_tgt = groups.str.lower() == tgt.lower()
+                if not mask_src.any() or not mask_tgt.any():
+                    print(f"[WARN] Skipping {src}->{tgt}: missing source or target rows")
+                    continue
+                Xs = X_scaled[mask_src.values]
+                Xt = X_scaled[mask_tgt.values]
+                w, kmm_model = _fit_kmm(Xs, Xt, params)
+                if w is None:
+                    continue
+                w = np.asarray(w, dtype=float) * float(params.get("kmm_scale", 1.0))
+                clip_min = params.get("kmm_clip_min")
+                clip_max = params.get("kmm_clip_max")
+                if clip_min is not None or clip_max is not None:
+                    w = np.clip(w, clip_min if clip_min is not None else w.min(), clip_max if clip_max is not None else w.max())
 
-            group_key = U.kmm_group_key(src, tgt)
-            out_dir = Path(args.output_root) / group_key / param_id
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_weights = pd.DataFrame({id_col: ids[mask_src].values, U.kmm_column_name(src, tgt): w})
-            weights_path = out_dir.parent / f"{param_id}.csv"
-            out_weights.to_csv(weights_path, index=False)
+                group_key = U.kmm_group_key(src, tgt)
+                out_dir = Path(args.output_root) / group_key / param_id
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_weights = pd.DataFrame({id_col: ids[mask_src].values, U.kmm_column_name(src, tgt): w})
+                weights_path = out_dir.parent / f"{param_id}.csv"
+                out_weights.to_csv(weights_path, index=False)
 
-            payload = {
-                "kmm_model": kmm_model,
-                "scaler": scaler,
-                "scale_mode": args.scale_mode,
-                "feature_names": feat_cols,
-                "target_X": Xt,
-                "params": params,
-            }
-            joblib.dump(payload, out_dir / "model.joblib")
+                payload = {
+                    "kmm_model": kmm_model,
+                    "scaler": scaler,
+                    "scale_mode": args.scale_mode,
+                    "feature_names": feat_cols,
+                    "target_X": Xt,
+                    "params": params,
+                }
+                joblib.dump(payload, out_dir / "model.joblib")
         return 0
 
     # apply mode
-    df = pd.read_csv(args.data_csv, low_memory=False)
+    csvs = args.data_csv if isinstance(args.data_csv, list) else [args.data_csv]
+    frames = [pd.read_csv(p, low_memory=False) for p in csvs]
+    df = pd.concat(frames, ignore_index=True)
     pairs = _parse_pairs(args.pairs)
     id_col = U.id_column(df) or "ID"
     ids = df[id_col].astype(str) if id_col in df.columns else pd.Series(df.index.astype(str))
@@ -477,7 +514,10 @@ def cmd_prefit_kmm(argv: List[str]) -> int:
             continue
         Xs = X_scaled[mask_src.values]
         if kmm_model is not None and hasattr(kmm_model, "predict_weights"):
-            w = kmm_model.predict_weights(Xs)
+            try:
+                w = kmm_model.predict_weights(Xs)
+            except TypeError:
+                w = kmm_model.predict_weights()
         elif target_X is not None:
             w = ops.compute_sample_weight_kmm(
                 Xs,

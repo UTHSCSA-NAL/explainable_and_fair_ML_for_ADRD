@@ -160,10 +160,23 @@ def compute_one_run(run_idx: int, args, df_full: pd.DataFrame):
         )
     else:
         explainer = _make_explainer(base_model, X_bg, args.model_output)
-        if args.model_output == "log_loss":
-            shap_vals = explainer.shap_values(X_te, y=y_test, check_additivity=False)
-        else:
-            shap_vals = explainer.shap_values(X_te, check_additivity=False)
+        try:
+            if args.model_output == "log_loss":
+                shap_vals = explainer.shap_values(X_te, y=y_test, check_additivity=False)
+            else:
+                shap_vals = explainer.shap_values(X_te, check_additivity=False)
+        except Exception as e:
+            print(f"[WARN] GPU SHAP failed ({e}); falling back to TreeExplainer on CPU.")
+            explainer = shap.TreeExplainer(
+                base_model,
+                data=X_bg,
+                model_output=args.model_output,
+                feature_perturbation="tree_path_dependent",
+            )
+            if args.model_output == "log_loss":
+                shap_vals = explainer.shap_values(X_te, y=y_test, check_additivity=False)
+            else:
+                shap_vals = explainer.shap_values(X_te, check_additivity=False)
         if isinstance(shap_vals, list):
             shap_vals = np.asarray(shap_vals)
             if shap_vals.ndim == 3:

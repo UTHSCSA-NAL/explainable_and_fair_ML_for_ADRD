@@ -1,5 +1,7 @@
 # Explainable and Fair ML for ADRD
 
+Code accompanying the paper [**Advancing fair and explainable machine learning for neuroimaging dementia pattern classification in multi-racial and multi-ethnic populations**](https://www.nature.com/articles/s41467-026-74515-w), published in *Nature Communications* **17**, 8026 (2026). [DOI: 10.1038/s41467-026-74515-w](https://doi.org/10.1038/s41467-026-74515-w).
+
 Dementia, a degenerative disease affecting millions globally, is projected to triple by 2050. Early and precise diagnosis is essential for effective treatment and improved quality of life. However, current diagnostic approaches frequently demonstrate inconsistent precision and impartiality, particularly among diverse cultural groups. This study investigates performance discrepancies in dementia classification among 6,584 White American, 1,263 African American, and 713 Hispanic populations. We reveal significant cross-group bias, particularly when models trained on one group are tested on another. To address this, we introduce a novel combination of few-shot learning and domain alignment to improve model adaptability across underrepresented populations. Our results show that these techniques substantially reduce inter-group performance gaps, especially between White American and Hispanic cohorts. This finding highlights the crucial need for fairness-aware strategies and the inclusion of diverse populations in training data to ensure accurate and equitable dementia diagnoses.
 
 ## What is included
@@ -137,3 +139,23 @@ Training produces:
 - `summary_metrics_*.json`: metrics
 - `sensitivity*.json`: method sensitivity records
 - `meta.json`: run metadata
+
+## Citation
+
+If you use this code or the methods in your research, please cite:
+
+Ho, N.-H., Charisis, S., Honnorat, N. et al. Advancing fair and explainable machine learning for neuroimaging dementia pattern classification in multi-racial and multi-ethnic populations. *Nature Communications* **17**, 8026 (2026). https://doi.org/10.1038/s41467-026-74515-w
+
+```bibtex
+@article{ho2026advancing,
+  title = {Advancing fair and explainable machine learning for neuroimaging dementia pattern classification in multi-racial and multi-ethnic populations},
+  author = {Ho, Ngoc-Huynh and Charisis, Sokratis and Honnorat, Nicolas and Brandigampala, Sachintha Ransara and Wang, Di and Heckbert, Susan R. and Fox, Peter T. and Martinez, David and Wang, David H. and Hughes, Timothy M. and Archer, Derek B. and Hohman, Timothy J. and Seshadri, Sudha and Davatzikos, Christos and Habes, Mohamad},
+  journal = {Nature Communications},
+  volume = {17},
+  number = {1},
+  pages = {8026},
+  year = {2026},
+  doi = {10.1038/s41467-026-74515-w},
+  url = {https://doi.org/10.1038/s41467-026-74515-w}
+}
+```

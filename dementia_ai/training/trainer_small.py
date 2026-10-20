@@ -316,6 +316,106 @@ def _align_features(df: pd.DataFrame, feat_cols: List[str], means: Dict[str, flo
     return pd.DataFrame(data, index=df.index)
 
 
+def _filter_merged_excluding_ids(merged_df: pd.DataFrame, train_df: pd.DataFrame, test_df: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows from merged_df whose IDs appear in train/test splits (best-effort)."""
+    candidates = ["subject_id", "mri_id", "rid", "ptid", "id"]
+    merged_col = None
+    split_col = None
+    for cand in candidates:
+        m_col = _find_column(merged_df, [cand])
+        tr_col = _find_column(train_df, [cand])
+        te_col = _find_column(test_df, [cand])
+        if m_col and (tr_col or te_col):
+            merged_col = m_col
+            split_col = tr_col or te_col
+            break
+    if merged_col is None or split_col is None:
+        print("[WARN] No shared ID column found; skipping merged/train-test overlap filter.")
+        return merged_df
+    split_ids = pd.concat([train_df[split_col], test_df[split_col]], ignore_index=True)
+    split_ids = set(split_ids.astype(str).tolist())
+    mask = ~merged_df[merged_col].astype(str).isin(split_ids)
+    return merged_df[mask].reset_index(drop=True)
+
+
+def _target_ethnicities(train_df: pd.DataFrame, test_df: pd.DataFrame, scenario: str) -> Optional[List[str]]:
+    """Return target ethnicity labels based on scenario (None means all)."""
+    scen = scenario.strip().lower()
+    if scen == "all":
+        return None
+    train_eth, _ = TV2._eth_masks(train_df)
+    test_eth, _ = TV2._eth_masks(test_df)
+    target_eths = sorted(set(test_eth.unique()) - set(train_eth.unique()))
+    if not target_eths:
+        print(f"[WARN] No target ethnicities found for scenario {scenario}.")
+    return target_eths
+
+
+def _combined_cohort_series(series: pd.Series) -> pd.Series:
+    upper = series.astype(str).str.upper()
+    return upper.map({
+        "NACC": "NACC+SCAN",
+        "SCAN": "NACC+SCAN",
+        "ADNI": "ADNI+STAC",
+        "STAC": "ADNI+STAC",
+    }).fillna(upper)
+
+
+def _select_test_target_indices(method_l: str, y_test: np.ndarray, test_df: pd.DataFrame,
+                                target_eths: Optional[List[str]], n_per: int, seed: int) -> np.ndarray:
+    eth_labels, _ = TV2._eth_masks(test_df)
+    if target_eths is None:
+        target_eths = sorted(eth_labels.unique())
+    else:
+        present = set(eth_labels.unique())
+        target_eths = [e for e in target_eths if e in present]
+    if not target_eths:
+        return np.array([], dtype=int)
+    if method_l == "ssda":
+        mask = eth_labels.isin(target_eths)
+        return np.where(mask.to_numpy())[0]
+    rng = np.random.default_rng(seed)
+    idxs = []
+    cohort_col = _find_column(test_df, ["cohort"])
+    if cohort_col is None:
+        for eth in target_eths:
+            eth_mask = (eth_labels == eth).to_numpy()
+            for cls in [0, 1]:
+                idx = np.where(eth_mask & (y_test == cls))[0]
+                if len(idx) == 0:
+                    continue
+                take = min(n_per, len(idx))
+                sel = rng.choice(idx, size=take, replace=False)
+                idxs.extend(sel.tolist())
+        return np.array(idxs, dtype=int)
+    cohorts = _combined_cohort_series(test_df[cohort_col])
+    for eth in target_eths:
+        eth_mask = (eth_labels == eth).to_numpy()
+        for cohort in sorted(cohorts.unique()):
+            coh_mask = (cohorts == cohort).to_numpy()
+            for cls in [0, 1]:
+                idx = np.where(eth_mask & coh_mask & (y_test == cls))[0]
+                if len(idx) == 0:
+                    continue
+                take = min(n_per, len(idx))
+                sel = rng.choice(idx, size=take, replace=False)
+                idxs.extend(sel.tolist())
+    return np.array(idxs, dtype=int)
+
+
+def _gid_counts_str(gids: Optional[np.ndarray], n: int) -> str:
+    if gids is None:
+        if n == 0:
+            return "white=0, black=0, hispanic=0, other=0"
+        return "ethnicity=unknown"
+    if len(gids) == 0:
+        return "white=0, black=0, hispanic=0, other=0"
+    counts = np.bincount(np.asarray(gids, dtype=int), minlength=4)
+    return f"white={counts[0]}, black={counts[1]}, hispanic={counts[2]}, other={counts[3]}"
+
+
+
+
 def _sample_target_from_merged(
     merged_df: pd.DataFrame,
     feat_cols: List[str],
@@ -324,6 +424,7 @@ def _sample_target_from_merged(
     scale_mode: int,
     n_per_cls_grp_cohort: int,
     seed: int,
+    eth_groups: Optional[List[str]] = None,
 ):
     """Stratified sample target data by cohort × ethnicity × class (with replacement if needed)."""
     cohort_col = _find_column(merged_df, ["cohort"])
@@ -353,25 +454,35 @@ def _sample_target_from_merged(
     if df.empty:
         return None
 
+    cohorts_desired = {"NACC", "SCAN", "ADNI", "STAC"}  # explicitly skip HABS-HD
+    df = df[df[cohort_col].isin(cohorts_desired)].reset_index(drop=True)
+    if df.empty:
+        return None
+
+    df["_COHORT_GROUP"] = _combined_cohort_series(df[cohort_col])
     rng = np.random.default_rng(seed)
     sampled_rows = []
-    cohorts_desired = {"NACC", "SCAN", "ADNI", "STAC"}  # explicitly skip HABS-HD
-    cohorts_iter = [c for c in sorted(df[cohort_col].unique()) if c in cohorts_desired] or sorted(df[cohort_col].unique())
+    cohorts_iter = sorted(df["_COHORT_GROUP"].unique())
+    eth_iter = ["White", "Black", "Hispanic", "Other"]
+    if eth_groups is not None:
+        eth_iter = [e.title() for e in eth_groups]
+        if not eth_iter:
+            return None
     missing = []
     for cohort in cohorts_iter:
-        sub_c = df[df[cohort_col] == cohort]
-        for eth in ["White", "Black", "Hispanic", "Other"]:
+        sub_c = df[df["_COHORT_GROUP"] == cohort]
+        for eth in eth_iter:
             sub_e = sub_c[sub_c[eth_col] == eth]
             for cls in [0, 1]:
                 sub_y = sub_e[sub_e[dx_col] == cls]
                 if sub_y.empty:
                     missing.append((cohort, eth, cls))
                     continue
-                take = n_per_cls_grp_cohort
+                take = min(n_per_cls_grp_cohort, len(sub_y))
                 sampled = sub_y.sample(
                     n=take,
                     random_state=int(rng.integers(0, 1_000_000)),
-                    replace=len(sub_y) < take,
+                    replace=False,
                 )
                 sampled_rows.append(sampled)
 
@@ -682,19 +793,66 @@ def _run_one_repeat(rep_idx: int, base_df: pd.DataFrame, train_df: Optional[pd.D
         predictions_done = True
     elif method_l in {"ssda", "regalign"}:
         effective_loss_mode = args.loss_mode or ("ce+target+align+gap" if method_l == "ssda" else "ce+align+gap")
-        # Build target set: use held-out test as default, optionally add stratified target from merged when refit
-        target_X, target_y, target_gid = TV2._build_custom_targets(method_l, args.scenario, Xte, y_test, test_df, external_blocks=[])
+        # Build target set: include selected test rows, optionally append stratified target from merged when refit
+        n_per = 50 if method_l == "ssda" else 5
+        target_eths = _target_ethnicities(train_df, test_df, args.scenario)
+        external_eths = None
+        if target_eths is not None:
+            external_eths = list(target_eths)
+            if "other" not in external_eths:
+                external_eths.append("other")
+        test_idx = _select_test_target_indices(method_l, y_test, test_df, target_eths, n_per, seed)
+        test_n = int(test_idx.size)
+        test_gid = None
+        ext_n = 0
+        ext_gid = None
+        if test_idx.size == 0:
+            print("[WARN] No target test samples selected; target set will rely on merged CSV only.")
+        target_X = Xte[test_idx]
+        target_y = y_test[test_idx] if method_l == "regalign" else None
+        target_gid = None
+        if "ETHNICITY" in test_df.columns:
+            eth_labels, _ = TV2._eth_masks(test_df)
+            gid_full = eth_labels.map({"white": 0, "black": 1, "hispanic": 2, "other": 3}).fillna(3).astype(int).to_numpy()
+            test_gid = gid_full[test_idx]
+            target_gid = test_gid
         expected_tgt = None
         if args.refit and args.merged_csv:
             try:
                 merged_df = pd.read_csv(args.merged_csv, low_memory=False)
-                n_per = 50 if method_l == "ssda" else 5
-                expected_tgt = n_per * 2 * 4 * 4
-                tgt_extra = _sample_target_from_merged(merged_df, feat_cols, id_means, scaler, args.scale_mode, n_per, seed)
+                merged_df = _filter_merged_excluding_ids(merged_df, train_df, test_df)
+                if external_eths is not None:
+                    eth_col = _find_column(merged_df, ["ethnicity"])
+                    if eth_col is not None:
+                        allowed_titles = {e.title() for e in external_eths}
+                        merged_df = merged_df[merged_df[eth_col].astype(str).str.title().isin(allowed_titles)].reset_index(drop=True)
+                tgt_extra = _sample_target_from_merged(
+                    merged_df, feat_cols, id_means, scaler, args.scale_mode, n_per, seed, eth_groups=external_eths
+                )
                 if tgt_extra is not None:
                     X_add, y_add, gid_add = tgt_extra
-                    # Replace with fully sampled target to hit desired counts
-                    target_X, target_y, target_gid = X_add, y_add, gid_add
+                    ext_n = X_add.shape[0]
+                    ext_gid = gid_add
+                    base_len = target_X.shape[0]
+                    target_X = np.vstack([target_X, X_add])
+                    if method_l == "regalign":
+                        target_y = np.concatenate([target_y, y_add]) if target_y is not None else y_add
+                    if gid_add is not None:
+                        if target_gid is None:
+                            target_gid = np.full(base_len, 3, dtype=int)
+                        target_gid = np.concatenate([target_gid, gid_add])
+                    expected_extra = None
+                    cohort_factor = 2
+                    cohort_col = _find_column(merged_df, ["cohort"])
+                    if cohort_col is not None:
+                        cohort_groups = _combined_cohort_series(merged_df[cohort_col])
+                        cohort_factor = len(sorted(cohort_groups.unique()))
+                    if external_eths is None:
+                        expected_extra = n_per * 2 * 4 * cohort_factor
+                    elif external_eths:
+                        expected_extra = n_per * 2 * len(external_eths) * cohort_factor
+                    if expected_extra is not None:
+                        expected_tgt = base_len + expected_extra
                 else:
                     print("[WARN] target sampling from merged CSV returned None.")
             except Exception as e:
@@ -702,6 +860,12 @@ def _run_one_repeat(rep_idx: int, base_df: pd.DataFrame, train_df: Optional[pd.D
         n_src = Xtr.shape[0]
         n_tgt = 0 if target_X is None else target_X.shape[0]
         print(f"[INFO] {method_l.upper()} refit: source n={n_src}, target n={n_tgt}")
+        print(
+            f"[INFO] {method_l.upper()} target test n={test_n} ({_gid_counts_str(test_gid, test_n)})"
+        )
+        print(
+            f"[INFO] {method_l.upper()} target external n={ext_n} ({_gid_counts_str(ext_gid, ext_n)})"
+        )
         if expected_tgt is not None and n_tgt != expected_tgt:
             print(f"[WARN] Expected target n={expected_tgt} but got n={n_tgt}. Check cohort/ethnicity/class coverage.")
         base_params = dict(baseline_params)

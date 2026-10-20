@@ -84,9 +84,13 @@ def select_feature_columns(df: pd.DataFrame) -> List[str]:
 
 def load_split_csv(path: str, cohort: Optional[str] = None) -> Tuple[pd.DataFrame, np.ndarray]:
     df = pd.read_csv(path, low_memory=False)
-    if df["DX"].dtype == object:
-        df["DX"] = df["DX"].map(DX_MAP).astype(int)
+    dx = df["DX"]
+    if not pd.api.types.is_numeric_dtype(dx):
+        dx = dx.map(DX_MAP)
+    dx = pd.to_numeric(dx, errors="coerce")
+    df["DX"] = dx
     df = df[df["DX"].isin([0, 1])].reset_index(drop=True)
+    df["DX"] = df["DX"].astype(int)
     if cohort is not None and cohort.strip().lower() != "all" and "COHORT" in df.columns:
         df = df[df["COHORT"].str.lower() == cohort.lower()].reset_index(drop=True)
     return df, df["DX"].values.astype(int)
@@ -360,8 +364,8 @@ def kmm_columns_for_scenario(scenario: str) -> Dict[str, str]:
 def kmm_param_id(params: Dict[str, Any]) -> str:
     """
     Stable identifier for a KMM param combo.
-    Format (shortened): kernel<val>B<val>eps<val>max_size<val>gamma<val>scale<val>
-    Example: kernelrbfB512eps0.1max_size500gamma0.5scale0.5
+    Format: key-val pairs joined by underscores.
+    Example: kernel-rbf_B-1000_eps-none_max_size-1000_gamma-none_scale-1
     """
     order = [
         ("kmm_kernel", "kernel"),
@@ -382,8 +386,8 @@ def kmm_param_id(params: Dict[str, Any]) -> str:
             val_txt = str(val).replace(" ", "")
         if val_txt.lower() == "none":
             val_txt = "none"
-        parts.append(f"{short}{val_txt}")
-    return "kmm_default" if not parts else "".join(parts)
+        parts.append(f"{short}-{val_txt}")
+    return "kmm_default" if not parts else "_".join(parts)
 
 
 def canonical_ethnicity(series: pd.Series) -> pd.Series:
@@ -463,9 +467,6 @@ def filter_cv_with_min_classes(cv, y, min_classes: int = 2):
     Return a list of (train_idx, valid_idx) where TRAIN has at least `min_classes` labels.
     Accepts an sklearn splitter (with .split) or an iterable of (tr, va).
     """
-    import yaml
-
-import numpy as np
     if hasattr(cv, "split"):
         splits = [(tr, va) for tr, va in cv.split(np.zeros(len(y)), y)
                   if np.unique(y[tr]).size >= min_classes]
